@@ -193,6 +193,45 @@ curl -X POST http://localhost:8787/webhooks/github \
   }'
 ```
 
+To generate a valid signature for testing, first make sure your `.dev.vars` file includes the webhook secret:
+
+```
+# In .dev.vars
+GITHUB_WEBHOOK_SECRET="your_webhook_secret_here"
+GITHUB_API_TOKEN="your_github_api_token_here"
+```
+
+Then use the included test script, which will automatically use the secret from your `.dev.vars` file:
+
+```sh
+# Make the script executable
+chmod +x test-webhook.sh
+
+# Run the test webhook script (uses secret from .dev.vars)
+./test-webhook.sh
+
+# Or specify a custom secret and event type
+./test-webhook.sh "custom_secret" "pull_request"
+```
+
+The script automatically:
+1. Creates an appropriate payload for the event type
+2. Generates a valid HMAC SHA-256 signature using your webhook secret
+3. Sends the webhook to your local server
+
+Alternatively, you can use the Node.js script for more detailed signature generation:
+
+```sh
+# Make the script executable
+chmod +x generate-signature.js
+
+# Generate a signature for a JSON file
+./generate-signature.js < test-payload.json
+
+# Or provide a specific webhook secret
+./generate-signature.js "your_secret" < test-payload.json
+```
+
 To generate a valid signature, you can use a tool like [webhook-signature-generator](https://webhook.site/webhook-signature-generator).
 
 #### How the Webhook Handler Works
