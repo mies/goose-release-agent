@@ -40,45 +40,17 @@ src/
 The ReleaseAgent is designed to automate the generation of release notes by processing GitHub webhook events and using AI to create structured, meaningful changelogs. Here's how it works:
 
 ```mermaid
-flowchart TD
-    subgraph GitHub
-        GR[GitHub Repository]
-        GWE[GitHub Webhook Events]
-    end
-    
-    subgraph GooseReleaseAgent[Goose Release Agent]
-        WH[Webhook Handler]
-        RA[ReleaseAgent]
-        DB[(Database)]
-        CG[Changelog Generator]
-        AS[Anthropic Service]
-    end
-    
-    GR --> GWE
-    GWE -->|1. Sends events| WH
-    
-    WH -->|2. Verify signature| WH
-    WH -->|3a. Process release event| RA
-    WH -->|3b. Process PR event| RA
-    WH -->|3c. Process push event| RA
-    
-    RA -->|4. Store data| DB
-    DB -->|5. Retrieve data| RA
-    
-    RA -->|6. Request changelog| CG
-    CG -->|7. Generate with AI| AS
-    AS -->|8. AI-generated content| CG
-    CG -->|9. Formatted changelog| RA
-    
-    RA -->|10. Store notes| DB
-    
-    style GitHub fill:#f9f,stroke:#333,stroke-width:2px
-    style GooseReleaseAgent fill:#f5f5f5,stroke:#333,stroke-width:2px
-    style WH fill:#bbf,stroke:#333,stroke-width:2px
-    style RA fill:#bbf,stroke:#333,stroke-width:2px
-    style DB fill:#bfb,stroke:#333,stroke-width:2px
-    style CG fill:#fbf,stroke:#333,stroke-width:2px
-    style AS fill:#fbf,stroke:#333,stroke-width:2px
+graph TD
+    A[GitHub Repository] --> B[GitHub Webhook Events]
+    B --> C[Webhook Handler]
+    C --> D[ReleaseAgent]
+    D --> E[(Database)]
+    E --> D
+    D --> F[Changelog Generator]
+    F --> G[Anthropic Service]
+    G --> F
+    F --> D
+    D --> E
 ```
 
 ### Flow Explanation:
