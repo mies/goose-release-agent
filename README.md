@@ -119,6 +119,117 @@ curl -X POST http://localhost:8787/releases \
   }'
   ```
 
+### GitHub Webhook Integration
+
+The system provides automatic release notes generation through GitHub webhooks. When configured, it will:
+
+1. Automatically detect new GitHub releases
+2. Collect associated pull requests and commits
+3. Categorize changes based on PR labels
+4. Generate structured release notes
+
+#### Setting Up GitHub Webhooks
+
+1. **Configure environment variables**:
+
+Add the following to your `.dev.vars` file:
+```
+GITHUB_API_TOKEN="your_github_personal_access_token"
+GITHUB_WEBHOOK_SECRET="your_webhook_secret_here"
+```
+
+2. **Create a GitHub webhook**:
+   
+   - Go to your GitHub repository → Settings → Webhooks → Add webhook
+   - Set Payload URL to: `https://your-worker-url.workers.dev/webhooks/github`
+   - Content type: `application/json`
+   - Secret: Same value as `GITHUB_WEBHOOK_SECRET`
+   - Events: Select `Releases`, `Pull requests`, and `Pushes`
+
+3. **Testing locally with ngrok**:
+
+   To test webhooks locally, you can use [ngrok](https://ngrok.com/):
+   ```sh
+   ngrok http 8787
+   ```
+   Then use the ngrok URL for your GitHub webhook.
+
+#### Webhook Payload Structure
+
+The webhook endpoint (`/webhooks/github`) accepts the following events:
+
+- **Release events**: Triggered when a release is published, created, or edited
+- **Pull request events**: Tracks merged PRs to associate with releases
+- **Push events**: Collects commits to provide detailed change information
+
+#### Manual Testing
+
+You can manually test the webhook with curl:
+
+```sh
+# Test a release event
+curl -X POST http://localhost:8787/webhooks/github \
+  -H "Content-Type: application/json" \
+  -H "X-GitHub-Event: release" \
+  -H "X-GitHub-Delivery: test-id" \
+  -H "X-Hub-Signature-256: sha256=<generated-signature>" \
+  -d '{
+    "action": "published",
+    "release": {
+      "id": 12345,
+      "tag_name": "v1.0.0",
+      "name": "Release 1.0.0",
+      "body": "Initial release"
+    },
+    "repository": {
+      "id": 54321,
+      "full_name": "owner/repo",
+      "name": "repo",
+      "owner": {
+        "login": "owner"
+      },
+      "default_branch": "main"
+    }
+  }'
+```
+
+To generate a valid signature, you can use a tool like [webhook-signature-generator](https://webhook.site/webhook-signature-generator).
+
+#### How the Webhook Handler Works
+
+The GitHub webhook integration is implemented with a clean, modular architecture:
+
+1. **GitHub Service** (`src/services/github.ts`)
+   - Handles all direct GitHub API interactions
+   - Verifies webhook signatures for security
+   - Fetches repository, release, PR, and commit data
+   - Provides typed interfaces for GitHub API responses
+
+2. **Webhook Handler** (`src/services/webhook-handler.ts`)
+   - Processes GitHub webhook events
+   - Stores data in the D1 database
+   - Associates PRs with releases
+   - Triggers release notes generation
+
+3. **Event Processing Flow**:
+   - **Release events**: When a release is published or created, the handler stores its information and fetches associated PRs.
+   - **PR events**: When a PR is merged, it's associated with the latest release or a draft release is created.
+   - **Push events**: Commits are collected and associated with PRs and releases.
+
+4. **Data Model**:
+   - Releases are stored with version, name, repository, and generated notes
+   - Pull requests include title, author, description, and are categorized
+   - Commits are associated with PRs and releases for detailed change tracking
+
+5. **Automatic Categorization**:
+   - PRs are automatically categorized based on their labels:
+     - `feature`, `enhancement`: Categorized as "Features"
+     - `bug`, `fix`: Categorized as "Bug Fixes"
+     - `documentation`, `docs`: Categorized as "Documentation"
+     - Other PRs are placed in an "Other Changes" category
+
+This webhook-based approach allows for automatic release notes generation without manual intervention, ensuring consistent and comprehensive documentation of changes.
+
 ### WebSocket Connections
 
 You can use any WebSocket client like [websocat](https://github.com/vi/websocat) to connect:
