@@ -40,13 +40,13 @@ src/
 The ReleaseAgent is designed to automate the generation of release notes by processing GitHub webhook events and using AI to create structured, meaningful changelogs. Here's how it works:
 
 ```mermaid
-graph TD
+flowchart TD
     subgraph GitHub
         GR[GitHub Repository]
         GWE[GitHub Webhook Events]
     end
     
-    subgraph "Goose Release Agent"
+    subgraph GooseReleaseAgent[Goose Release Agent]
         WH[Webhook Handler]
         RA[ReleaseAgent]
         DB[(Database)]
@@ -54,7 +54,7 @@ graph TD
         AS[Anthropic Service]
     end
     
-    GR -->|Triggers| GWE
+    GR --> GWE
     GWE -->|1. Sends events| WH
     
     WH -->|2. Verify signature| WH
@@ -72,15 +72,13 @@ graph TD
     
     RA -->|10. Store notes| DB
     
-    classDef github fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef agent fill:#bbf,stroke:#333,stroke-width:2px;
-    classDef db fill:#bfb,stroke:#333,stroke-width:2px;
-    classDef ai fill:#fbf,stroke:#333,stroke-width:2px;
-    
-    class GR,GWE github;
-    class WH,RA agent;
-    class DB db;
-    class CG,AS ai;
+    style GitHub fill:#f9f,stroke:#333,stroke-width:2px
+    style GooseReleaseAgent fill:#f5f5f5,stroke:#333,stroke-width:2px
+    style WH fill:#bbf,stroke:#333,stroke-width:2px
+    style RA fill:#bbf,stroke:#333,stroke-width:2px
+    style DB fill:#bfb,stroke:#333,stroke-width:2px
+    style CG fill:#fbf,stroke:#333,stroke-width:2px
+    style AS fill:#fbf,stroke:#333,stroke-width:2px
 ```
 
 ### Flow Explanation:
