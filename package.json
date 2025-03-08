@@ -10,9 +10,11 @@
     "db:seed": "tsx seed.ts",
     "db:seed:prod": "ENVIRONMENT=production tsx seed.ts",
     "db:setup": "npm run db:touch && npm run db:generate && npm run db:migrate && npm run db:seed",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test:changelog": "curl -X POST http://localhost:8787/releases/4/changelog -H \"Content-Type: application/json\" -d '{\"format\":\"markdown\",\"style\":\"technical\",\"includeCommits\":true}'"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@fiberplane/hono": "0.4.4-beta.2",
     "agents-sdk": "^0.0.25",
     "dotenv": "^16.4.5",

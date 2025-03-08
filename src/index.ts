@@ -441,6 +441,45 @@ app.post('/webhooks/github', async (c) => {
   }
 });
 
+// Endpoint to generate or regenerate release notes for a specific release
+app.post('/releases/:id/changelog', async (c) => {
+  try {
+    const releaseId = parseInt(c.req.param('id'));
+    
+    if (isNaN(releaseId)) {
+      return c.json({ error: 'Invalid release ID' }, 400);
+    }
+    
+    const body = await c.req.json();
+    const format = body.format || 'markdown';
+    const includeCommits = body.includeCommits !== false;
+    const style = body.style || 'technical';
+    const customPrompt = body.customPrompt;
+    
+    // Create webhook handler to handle the request
+    const webhookHandler = createWebhookHandler(c.env);
+    
+    // Generate the release notes
+    const result = await webhookHandler.generateReleaseNotes(
+      releaseId,
+      format as 'json' | 'markdown' | 'html',
+      includeCommits,
+      style as 'technical' | 'user-friendly' | 'detailed' | 'concise',
+      customPrompt
+    );
+    
+    if (!result.success) {
+      return c.json({ error: result.message }, 400);
+    }
+    
+    return c.json(result);
+  } catch (error: unknown) {
+    console.error('Error generating changelog:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return c.json({ error: errorMessage }, 500);
+  }
+});
+
 // Export the agent classes
 export { ChatAgent, AssistantAgent, ReleaseAgent };
 export default app;

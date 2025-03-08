@@ -17,16 +17,93 @@ The codebase is organized into a clean, modular structure:
 
 ```
 src/
-├── agents/            # Agent implementations
-│   ├── index.ts       # Re-exports all agents
-│   ├── ChatAgent.ts   # Chat agent implementation
-│   └── AssistantAgent.ts # Assistant agent implementation
-├── types.ts           # Shared type definitions
-├── utils/             # Utility functions
-│   ├── index.ts       # Re-exports all utilities
-│   └── agentUtils.ts  # Agent communication utilities
-└── index.ts           # Main application entry point
+├── agents/                  # Agent implementations
+│   ├── index.ts             # Re-exports all agents
+│   ├── ChatAgent.ts         # Chat agent implementation 
+│   ├── AssistantAgent.ts    # Assistant agent implementation
+│   └── ReleaseAgent.ts      # Release notes generator agent
+├── db/                      # Database definitions
+│   └── schema.ts            # Drizzle ORM schema definitions
+├── services/                # Service modules
+│   ├── github.ts            # GitHub API integration service
+│   ├── webhook-handler.ts   # GitHub webhook event processor
+│   └── changelog-generator.ts # AI-powered changelog generator
+├── types.ts                 # Shared type definitions
+├── utils/                   # Utility functions
+│   ├── index.ts             # Re-exports all utilities
+│   └── agentUtils.ts        # Agent communication utilities
+└── index.ts                 # Main application entry point with API routes
 ```
+
+## Release Notes Generation
+
+The ReleaseAgent is designed to automate the generation of release notes by processing GitHub webhook events and using AI to create structured, meaningful changelogs. Here's how it works:
+
+```mermaid
+graph TD
+    subgraph GitHub
+        GR[GitHub Repository]
+        GWE[GitHub Webhook Events]
+    end
+    
+    subgraph "Goose Release Agent"
+        WH[Webhook Handler]
+        RA[ReleaseAgent]
+        DB[(Database)]
+        CG[Changelog Generator]
+        AS[Anthropic Service]
+    end
+    
+    GR -->|Triggers| GWE
+    GWE -->|1. Sends events| WH
+    
+    WH -->|2. Verify signature| WH
+    WH -->|3a. Process release event| RA
+    WH -->|3b. Process PR event| RA
+    WH -->|3c. Process push event| RA
+    
+    RA -->|4. Store data| DB
+    DB -->|5. Retrieve data| RA
+    
+    RA -->|6. Request changelog| CG
+    CG -->|7. Generate with AI| AS
+    AS -->|8. AI-generated content| CG
+    CG -->|9. Formatted changelog| RA
+    
+    RA -->|10. Store notes| DB
+    
+    classDef github fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef agent fill:#bbf,stroke:#333,stroke-width:2px;
+    classDef db fill:#bfb,stroke:#333,stroke-width:2px;
+    classDef ai fill:#fbf,stroke:#333,stroke-width:2px;
+    
+    class GR,GWE github;
+    class WH,RA agent;
+    class DB db;
+    class CG,AS ai;
+end
+```
+
+### Flow Explanation:
+
+1. **GitHub Webhook Events**: When activities occur in your GitHub repository (releases published, PRs merged, commits pushed), GitHub sends webhook events to your application.
+
+2. **Webhook Handler**: Validates the request signature using your GitHub webhook secret and processes different event types.
+
+3. **Event Processing**:
+   - **Release Events**: When a new release is created/published on GitHub
+   - **Pull Request Events**: When PRs are opened, closed, or merged
+   - **Push Events**: When commits are pushed to the repository
+
+4. **Data Storage**: The ReleaseAgent stores releases, pull requests, commits, and their relationships in the database.
+
+5. **Changelog Generation**: When requested, the system:
+   - Retrieves the release and its associated PRs and commits
+   - Categorizes changes based on PR labels or commit messages
+   - Uses the Anthropic Claude API to generate well-structured release notes
+   - Returns formatted changelogs (Markdown, HTML, or JSON)
+
+This automated process ensures your release notes are consistently formatted, include all relevant changes, and provide meaningful context for users.
 
 ## Getting Started
 
@@ -299,7 +376,61 @@ The GitHub webhook integration is implemented with a clean, modular architecture
      - `documentation`, `docs`: Categorized as "Documentation"
      - Other PRs are placed in an "Other Changes" category
 
-This webhook-based approach allows for automatic release notes generation without manual intervention, ensuring consistent and comprehensive documentation of changes.
+#### AI-Powered Changelog Generation
+
+The system uses Anthropic's Claude AI model to automatically generate high-quality changelogs from commit messages and pull requests:
+
+1. **Setup**:
+
+   Add your Anthropic API key to the environment:
+   ```
+   # In .dev.vars
+   ANTHROPIC_API_KEY="your_anthropic_api_key_here"
+   ```
+
+2. **How It Works**:
+   - Collects information about a release, its pull requests, and commits
+   - Groups changes by category (features, bug fixes, etc.)
+   - Generates a well-structured, human-readable changelog using the official Anthropic TypeScript SDK
+   - Formats output in markdown, HTML, or JSON as needed
+   - Updates the release record with the generated notes
+
+3. **Implementation Details**:
+   - Uses `@anthropic-ai/sdk` for reliable API integration
+   - Supports the latest Claude models (currently defaulting to claude-3-haiku-20240307)
+   - Includes fallback mock responses for development without an API key
+   - Handles structured JSON output for programmatic use
+
+4. **Customization Options**:
+   - **Format**: Choose from `markdown`, `html`, or `json` formats
+   - **Style**: Select from several writing styles:
+     - `technical`: Detailed and precise for developers
+     - `user-friendly`: Accessible for non-technical users
+     - `detailed`: Comprehensive explanations of changes
+     - `concise`: Brief and to the point
+   - **Include Commits**: Option to include individual commits in the changelog
+   - **Custom Prompts**: Add specific instructions for the AI
+
+5. **Generating Changelogs via API**:
+   ```sh
+   # Generate a changelog for a release
+   curl -X POST http://localhost:8787/releases/123/changelog \
+     -H "Content-Type: application/json" \
+     -d '{
+       "format": "markdown",
+       "style": "technical",
+       "includeCommits": true,
+       "customPrompt": "Focus on security improvements"
+     }'
+   ```
+
+6. **Testing Locally**:
+   ```sh
+   # Create a release and test data
+   pnpm run test:changelog
+   ```
+
+   This script creates a test release with sample PRs and commits, then generates a changelog using the AI.
 
 ### WebSocket Connections
 

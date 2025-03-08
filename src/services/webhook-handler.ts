@@ -8,6 +8,7 @@ import {
   GitHubPullRequestWebhookPayload,
   GitHubPushWebhookPayload
 } from './github';
+import { ChangelogGenerator, createChangelogGenerator, ChangelogOptions } from './changelog-generator';
 
 /**
  * WebhookHandler processes GitHub webhook events and manages the database and API interactions
@@ -15,6 +16,7 @@ import {
 export class WebhookHandler {
   private db: ReturnType<typeof drizzle>;
   private githubService: GitHubService;
+  private changelogGenerator: ChangelogGenerator;
 
   constructor(env: Bindings) {
     this.db = drizzle(env.DB);
@@ -22,6 +24,7 @@ export class WebhookHandler {
       env.GITHUB_API_TOKEN || '',
       env.GITHUB_WEBHOOK_SECRET || ''
     );
+    this.changelogGenerator = createChangelogGenerator(env);
   }
 
   /**
@@ -208,17 +211,119 @@ export class WebhookHandler {
 
   /**
    * Generate release notes for a release
-   * @param releaseId The ID of the release
-   * @param format Format for the release notes
-   * @param includeCommits Whether to include commits in the notes
    */
   async generateReleaseNotes(
     releaseId: number, 
     format: 'json' | 'markdown' | 'html' = 'markdown',
-    includeCommits = true
-  ): Promise<{ success: boolean; message?: string }> {
+    includeCommits = true,
+    style: 'technical' | 'user-friendly' | 'detailed' | 'concise' = 'technical',
+    customPrompt?: string
+  ): Promise<{ success: boolean; message?: string; notes?: any }> {
     try {
-      // Create a request to the ReleaseAgent to generate notes
+      console.log(`Generating release notes for release ID ${releaseId}`);
+      
+      // Fetch the release from the database
+      const releases = await this.db.select()
+        .from(schema.releases)
+        .where(eq(schema.releases.id, releaseId))
+        .limit(1);
+      
+      if (releases.length === 0) {
+        return { success: false, message: `Release with ID ${releaseId} not found` };
+      }
+      
+      const release = releases[0];
+      
+      // Convert DB release object to the expected Release type
+      // This handles conversion from null to undefined for optional fields
+      const releaseData = {
+        id: release.id,
+        version: release.version,
+        name: release.name ?? undefined,
+        repository: release.repository,
+        releaseDate: release.releaseDate,
+        description: release.description ?? undefined,
+        generatedNotes: release.generatedNotes ?? undefined,
+        publishedStatus: release.publishedStatus as 'draft' | 'published' | undefined
+      };
+      
+      // Fetch all PRs associated with this release
+      const pullRequestsData = await this.db.select()
+        .from(schema.pullRequests)
+        .where(eq(schema.pullRequests.releaseId, releaseId));
+      
+      // Convert DB pull requests to the expected PullRequest type
+      const pullRequests = pullRequestsData.map(pr => ({
+        id: pr.id,
+        prNumber: pr.prNumber,
+        releaseId: pr.releaseId ?? undefined,
+        title: pr.title,
+        author: pr.author,
+        description: pr.description ?? undefined,
+        url: pr.url,
+        mergedAt: pr.mergedAt,
+        labels: pr.labels ? JSON.parse(pr.labels) : undefined,
+        categoryId: pr.categoryId ?? undefined
+      }));
+      
+      // Fetch all commits associated with this release
+      const commitsData = includeCommits ? 
+        await this.db.select()
+          .from(schema.commits)
+          .where(eq(schema.commits.releaseId, releaseId)) : 
+        [];
+      
+      // Convert DB commits to the expected Commit type
+      const commits = commitsData.map(commit => ({
+        id: commit.id,
+        hash: commit.hash,
+        releaseId: commit.releaseId ?? undefined,
+        pullRequestId: commit.pullRequestId ?? undefined,
+        message: commit.message,
+        author: commit.author,
+        authorEmail: commit.authorEmail ?? undefined,
+        date: commit.date
+      }));
+      
+      // Fetch all categories
+      const categoriesData = await this.db.select().from(schema.categories);
+      
+      // Convert DB categories to the expected Category type
+      const categories = categoriesData.map(category => ({
+        id: category.id,
+        name: category.name,
+        description: category.description ?? undefined,
+        displayOrder: category.displayOrder ?? undefined
+      }));
+      
+      // Generate the changelog using Claude
+      const options: ChangelogOptions = {
+        format,
+        style,
+        includeCommits,
+        customPrompt
+      };
+      
+      console.log(`Generating changelog for ${release.version} with ${pullRequests.length} PRs and ${commits.length} commits`);
+      
+      const releaseNotes = await this.changelogGenerator.generateReleaseNotes(
+        releaseData,
+        pullRequests,
+        commits,
+        categories,
+        options
+      );
+      
+      // Update the release with the generated notes
+      await this.db.update(schema.releases)
+        .set({
+          generatedNotes: JSON.stringify(releaseNotes),
+          updatedAt: new Date().toISOString()
+        })
+        .where(eq(schema.releases.id, releaseId));
+      
+      // If we want to send this to the ReleaseAgent as well, we can do that here
+      /*
       const generateRequest = new Request('http://internal/generate-notes', {
         method: 'POST',
         headers: {
@@ -232,10 +337,12 @@ export class WebhookHandler {
           includeCommits
         })
       });
-
-      // We'll need to send this to the ReleaseAgent
-      // For now, return success
-      return { success: true };
+      */
+      
+      return { 
+        success: true, 
+        notes: releaseNotes 
+      };
     } catch (error) {
       console.error('Error generating release notes:', error);
       return { 

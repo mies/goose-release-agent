@@ -19,6 +19,7 @@ export type Bindings = {
   GITHUB_API_TOKEN?: string;
   GITHUB_WEBHOOK_SECRET?: string;
   SLACK_WEBHOOK_URL?: string;
+  ANTHROPIC_API_KEY?: string;
 };
 
 /**
