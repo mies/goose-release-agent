@@ -210,14 +210,18 @@ chmod +x test-webhook.sh
 # Run the test webhook script (uses secret from .dev.vars)
 ./test-webhook.sh
 
-# Or specify a custom secret and event type
-./test-webhook.sh "custom_secret" "pull_request"
+# Test different event types
+./test-webhook.sh "" pull_request
+./test-webhook.sh "" push
 ```
 
 The script automatically:
 1. Creates an appropriate payload for the event type
 2. Generates a valid HMAC SHA-256 signature using your webhook secret
-3. Sends the webhook to your local server
+3. Sends the webhook to your local server with test_mode=true
+
+> **Note**: The test_mode parameter prevents making real GitHub API calls, allowing you to
+> test the webhook endpoint safely without requiring valid GitHub credentials.
 
 Alternatively, you can use the Node.js script for more detailed signature generation:
 
@@ -233,6 +237,34 @@ chmod +x generate-signature.js
 ```
 
 To generate a valid signature, you can use a tool like [webhook-signature-generator](https://webhook.site/webhook-signature-generator).
+
+#### Successful Test Responses
+
+When testing webhooks in test mode, you should see responses like:
+
+```json
+// For release events
+{
+  "success": true,
+  "event": "release",
+  "action": "published",
+  "result": {
+    "status": "test_mode_success",
+    "message": "Successfully processed test webhook for release.published"
+  }
+}
+
+// For pull request events
+{
+  "success": true,
+  "event": "pull_request",
+  "action": "closed",
+  "result": {
+    "status": "test_mode_success",
+    "message": "Successfully processed test webhook for pull_request.closed"
+  }
+}
+```
 
 #### How the Webhook Handler Works
 

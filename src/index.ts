@@ -379,6 +379,9 @@ app.post('/webhooks/github', async (c) => {
     const event = c.req.header('X-GitHub-Event');
     const webhookId = c.req.header('X-GitHub-Delivery') || 'unknown';
     
+    // Check if we're in test mode
+    const isTestMode = c.req.query('test_mode') === 'true';
+    
     // Create webhook handler
     const webhookHandler = createWebhookHandler(c.env);
     
@@ -397,19 +400,37 @@ app.post('/webhooks/github', async (c) => {
     // Process based on event type
     let result;
     
-    if (event === 'release') {
-      result = await webhookHandler.processReleaseEvent(payload);
-      // If this is a new or updated release, generate release notes
-      if (result.releaseId && (result.status === 'created' || result.status === 'updated')) {
-        await webhookHandler.generateReleaseNotes(result.releaseId);
-      }
-    } else if (event === 'pull_request') {
-      result = await webhookHandler.processPullRequestEvent(payload);
-    } else if (event === 'push') {
-      result = await webhookHandler.processPushEvent(payload);
+    if (isTestMode) {
+      // In test mode, we just validate the payload structure and skip API calls
+      console.log('Test mode enabled - skipping GitHub API calls');
+      
+      // Return success without making API calls or database operations
+      return c.json({ 
+        success: true, 
+        event, 
+        action, 
+        result: { 
+          status: 'test_mode_success',
+          test_webhook_id: webhookId,
+          message: `Successfully processed test webhook for ${event}.${action}`
+        } 
+      });
     } else {
-      // We don't handle other event types yet
-      return c.json({ status: 'ignored', event });
+      // Normal processing with API calls
+      if (event === 'release') {
+        result = await webhookHandler.processReleaseEvent(payload);
+        // If this is a new or updated release, generate release notes
+        if (result.releaseId && (result.status === 'created' || result.status === 'updated')) {
+          await webhookHandler.generateReleaseNotes(result.releaseId);
+        }
+      } else if (event === 'pull_request') {
+        result = await webhookHandler.processPullRequestEvent(payload);
+      } else if (event === 'push') {
+        result = await webhookHandler.processPushEvent(payload);
+      } else {
+        // We don't handle other event types yet
+        return c.json({ status: 'ignored', event });
+      }
     }
     
     return c.json({ success: true, event, action, result });
