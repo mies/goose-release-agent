@@ -81,7 +81,6 @@ graph TD
     class WH,RA agent;
     class DB db;
     class CG,AS ai;
-end
 ```
 
 ### Flow Explanation:
