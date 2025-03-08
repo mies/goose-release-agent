@@ -12,12 +12,13 @@ migrations_dir = "drizzle/migrations"
 [durable_objects]
 bindings = [
   { name = "ChatAgent", class_name = "ChatAgent" },
-  { name = "AssistantAgent", class_name = "AssistantAgent" }
+  { name = "AssistantAgent", class_name = "AssistantAgent" },
+  { name = "ReleaseAgent", class_name = "ReleaseAgent" }
 ]
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["ChatAgent", "AssistantAgent"]
+new_sqlite_classes = ["ChatAgent", "AssistantAgent", "ReleaseAgent"]
 
 # [vars]
 # MY_VAR = "my-variable"

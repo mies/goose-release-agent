@@ -106,6 +106,19 @@ curl -X POST http://localhost:8787/assistant \
   -d '{"query":"What is the weather like?"}'
 ```
 
+#### ReleaseAgent:
+
+```sh
+curl -X POST http://localhost:8787/releases \
+  -H "Content-Type: application/json" \
+  -d '{
+    "version": "1.0.0",
+    "repository": "owner/repo",
+    "name": "First Official Release",
+    "description": "This release includes several new features and bug fixes."
+  }'
+  ```
+
 ### WebSocket Connections
 
 You can use any WebSocket client like [websocat](https://github.com/vi/websocat) to connect:

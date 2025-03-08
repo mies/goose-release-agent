@@ -8,10 +8,13 @@ import { routeAgentRequest } from "agents-sdk";
 
 // Import types and agents
 import { type Bindings } from "./types";
-import { ChatAgent, AssistantAgent } from "./agents";
+import { ChatAgent, AssistantAgent, ReleaseAgent } from "./agents";
 
 // Import utility functions
 import { queryAgent } from "./utils";
+
+// Import services
+import { createWebhookHandler } from './services/webhook-handler';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -203,8 +206,222 @@ app.use("/fp/*", createFiberplane({
   openapi: { url: "/openapi.json" }
 }));
 
+// Standard REST API route for ReleaseAgent
+app.get("/releases", async (c) => {
+  try {
+    return await queryAgent(c.env.ReleaseAgent, 'ReleaseAgent', {}, 'default', '/releases');
+  } catch (error: unknown) {
+    console.error('Error processing releases request:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return c.text(`Release error: ${errorMessage}`, 500);
+  }
+});
+
+app.get("/release/:id", async (c) => {
+  const id = c.req.param('id');
+  try {
+    return await queryAgent(c.env.ReleaseAgent, 'ReleaseAgent', {}, 'default', `/release/${id}`);
+  } catch (error: unknown) {
+    console.error('Error processing release request:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return c.text(`Release error: ${errorMessage}`, 500);
+  }
+});
+
+app.get("/categories", async (c) => {
+  try {
+    return await queryAgent(c.env.ReleaseAgent, 'ReleaseAgent', {}, 'default', '/categories');
+  } catch (error: unknown) {
+    console.error('Error processing categories request:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return c.text(`Categories error: ${errorMessage}`, 500);
+  }
+});
+
+app.post("/releases", async (c) => {
+  try {
+    const body = await c.req.json();
+    const requestUrl = new URL('http://internal/releases');
+    
+    // Create a stub for the ReleaseAgent Durable Object
+    const id = c.env.ReleaseAgent.idFromName('default');
+    const stub = c.env.ReleaseAgent.get(id);
+    
+    // Set required headers
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/json');
+    headers.set('x-partykit-namespace', 'ReleaseAgent');
+    headers.set('x-partykit-room', 'default');
+    
+    // Create the request to the agent
+    const agentRequest = new Request(requestUrl.toString(), {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(body)
+    });
+    
+    // Send the request to the agent
+    const response = await stub.fetch(agentRequest);
+    
+    return response;
+  } catch (error: unknown) {
+    console.error('Error creating release:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return c.text(`Release creation error: ${errorMessage}`, 500);
+  }
+});
+
+app.post("/prs", async (c) => {
+  try {
+    const body = await c.req.json();
+    const requestUrl = new URL('http://internal/prs');
+    
+    // Create a stub for the ReleaseAgent Durable Object
+    const id = c.env.ReleaseAgent.idFromName('default');
+    const stub = c.env.ReleaseAgent.get(id);
+    
+    // Set required headers
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/json');
+    headers.set('x-partykit-namespace', 'ReleaseAgent');
+    headers.set('x-partykit-room', 'default');
+    
+    // Create the request to the agent
+    const agentRequest = new Request(requestUrl.toString(), {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(body)
+    });
+    
+    // Send the request to the agent
+    const response = await stub.fetch(agentRequest);
+    
+    return response;
+  } catch (error: unknown) {
+    console.error('Error adding pull requests:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return c.text(`Pull request error: ${errorMessage}`, 500);
+  }
+});
+
+app.post("/commits", async (c) => {
+  try {
+    const body = await c.req.json();
+    const requestUrl = new URL('http://internal/commits');
+    
+    // Create a stub for the ReleaseAgent Durable Object
+    const id = c.env.ReleaseAgent.idFromName('default');
+    const stub = c.env.ReleaseAgent.get(id);
+    
+    // Set required headers
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/json');
+    headers.set('x-partykit-namespace', 'ReleaseAgent');
+    headers.set('x-partykit-room', 'default');
+    
+    // Create the request to the agent
+    const agentRequest = new Request(requestUrl.toString(), {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(body)
+    });
+    
+    // Send the request to the agent
+    const response = await stub.fetch(agentRequest);
+    
+    return response;
+  } catch (error: unknown) {
+    console.error('Error adding commits:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return c.text(`Commit error: ${errorMessage}`, 500);
+  }
+});
+
+app.post("/generate-notes", async (c) => {
+  try {
+    const body = await c.req.json();
+    const requestUrl = new URL('http://internal/generate-notes');
+    
+    // Create a stub for the ReleaseAgent Durable Object
+    const id = c.env.ReleaseAgent.idFromName('default');
+    const stub = c.env.ReleaseAgent.get(id);
+    
+    // Set required headers
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/json');
+    headers.set('x-partykit-namespace', 'ReleaseAgent');
+    headers.set('x-partykit-room', 'default');
+    
+    // Create the request to the agent
+    const agentRequest = new Request(requestUrl.toString(), {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(body)
+    });
+    
+    // Send the request to the agent
+    const response = await stub.fetch(agentRequest);
+    
+    return response;
+  } catch (error: unknown) {
+    console.error('Error generating notes:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return c.text(`Notes generation error: ${errorMessage}`, 500);
+  }
+});
+
+// GitHub webhook endpoint
+app.post('/webhooks/github', async (c) => {
+  try {
+    // Get the raw payload
+    const rawPayload = await c.req.text();
+    const signature = c.req.header('X-Hub-Signature-256');
+    const event = c.req.header('X-GitHub-Event');
+    const webhookId = c.req.header('X-GitHub-Delivery') || 'unknown';
+    
+    // Create webhook handler
+    const webhookHandler = createWebhookHandler(c.env);
+    
+    // Verify signature
+    if (!signature || !(await webhookHandler.verifyWebhookSignature(rawPayload, signature))) {
+      console.error(`Invalid webhook signature for ${webhookId}`);
+      return c.text('Invalid webhook signature', 401);
+    }
+    
+    // Parse the payload again for processing
+    const payload = JSON.parse(rawPayload);
+    const action = payload.action || 'unknown';
+    
+    console.log(`Received GitHub webhook: ${event}.${action} (${webhookId})`);
+    
+    // Process based on event type
+    let result;
+    
+    if (event === 'release') {
+      result = await webhookHandler.processReleaseEvent(payload);
+      // If this is a new or updated release, generate release notes
+      if (result.releaseId && (result.status === 'created' || result.status === 'updated')) {
+        await webhookHandler.generateReleaseNotes(result.releaseId);
+      }
+    } else if (event === 'pull_request') {
+      result = await webhookHandler.processPullRequestEvent(payload);
+    } else if (event === 'push') {
+      result = await webhookHandler.processPushEvent(payload);
+    } else {
+      // We don't handle other event types yet
+      return c.json({ status: 'ignored', event });
+    }
+    
+    return c.json({ success: true, event, action, result });
+  } catch (error: unknown) {
+    console.error('Error processing webhook:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return c.json({ status: 'error', error: errorMessage }, 500);
+  }
+});
+
 // Export the agent classes
-export { ChatAgent, AssistantAgent };
+export { ChatAgent, AssistantAgent, ReleaseAgent };
 export default app;
 
 // Export the instrumented app if you've wired up a Fiberplane-Hono-OpenTelemetry trace collector
