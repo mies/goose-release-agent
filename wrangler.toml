@@ -8,6 +8,17 @@ database_name = "honc-d1-database"
 database_id = "local-honc-d1-database"
 migrations_dir = "drizzle/migrations"
 
+# Agent configuration - Required for Durable Objects that power the agents
+[durable_objects]
+bindings = [
+  { name = "ChatAgent", class_name = "ChatAgent" },
+  { name = "AssistantAgent", class_name = "AssistantAgent" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatAgent", "AssistantAgent"]
+
 # [vars]
 # MY_VAR = "my-variable"
 
