@@ -1,102 +1,300 @@
-## 🪿 HONC
+# 🪿 Goose Release Agent
 
-This is a project created with the `create-honc-app` template. 
+A powerful agent-based backend system built on the HONC stack (Hono, OTEL, Nameyourdatabase, Cloudflare). This system leverages Cloudflare Workers, Durable Objects, and D1 to create stateful, real-time agent interactions through both WebSocket and REST API interfaces.
 
-Learn more about the HONC stack on the [website](https://honc.dev) or the main [repo](https://github.com/fiberplane/create-honc-app).
+## Features
 
-There is also an [Awesome HONC collection](https://github.com/fiberplane/awesome-honc) with further guides, use cases and examples.
+- **Stateful Agents**: Persistent agent instances powered by Cloudflare Durable Objects
+- **Real-time Communication**: WebSocket support for interactive agent sessions
+- **REST API**: Clean HTTP endpoints for simple agent interactions
+- **Modular Architecture**: Easily extend with new agent types
+- **SQLite Storage**: Built-in state persistence through Durable Objects
+- **TypeScript**: Fully typed codebase for better development experience
 
-### Getting started
-[D1](https://developers.cloudflare.com/d1/) is Cloudflare's serverless SQL database. Running HONC with a D1 database involves two key steps: first, setting up the project locally, and second, deploying it in production. You can spin up your D1 database locally using Wrangler. If you're planning to deploy your application for production use, ensure that you have created a D1 instance in your Cloudflare account.
+## Architecture
 
-### Project structure
+The codebase is organized into a clean, modular structure:
 
-```#
-├── src
-│   ├── index.ts # Hono app entry point
-│   └── db
-│       └── schema.ts # Database schema
-├── .dev.vars.example # Example .dev.vars file
-├── .prod.vars.example # Example .prod.vars file
-├── seed.ts # Optional script to seed the db
-├── drizzle.config.ts # Drizzle configuration
-├── package.json
-├── tsconfig.json # TypeScript configuration
-└── wrangler.toml # Cloudflare Workers configuration
+```
+src/
+├── agents/            # Agent implementations
+│   ├── index.ts       # Re-exports all agents
+│   ├── ChatAgent.ts   # Chat agent implementation
+│   └── AssistantAgent.ts # Assistant agent implementation
+├── types.ts           # Shared type definitions
+├── utils/             # Utility functions
+│   ├── index.ts       # Re-exports all utilities
+│   └── agentUtils.ts  # Agent communication utilities
+└── index.ts           # Main application entry point
 ```
 
-### Commands for local development
+## Getting Started
 
-Run the migrations and (optionally) seed the database:
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (v18+)
+- [pnpm](https://pnpm.io/installation) package manager
+- [Cloudflare account](https://dash.cloudflare.com/sign-up) for deployment
+
+### Local Development
+
+1. **Clone the repository**:
 
 ```sh
-# this is a convenience script that runs db:touch, db:generate, db:migrate, and db:seed
-npm run db:setup
+git clone <repository-url>
+cd goose-release-agent
 ```
 
-Run the development server:
+2. **Install dependencies**:
 
 ```sh
-npm run dev
+pnpm install
 ```
 
-As you iterate on the database schema, you'll need to generate a new migration file and apply it like so:
+3. **Set up environment variables**:
+
+Create a `.dev.vars` file based on the provided example:
 
 ```sh
-npm run db:generate
-npm run db:migrate
+cp .dev.vars.example .dev.vars
+# Edit .dev.vars with your values
 ```
 
-### Commands for deployment
-
-Before deploying your worker to Cloudflare, ensure that you have a running D1 instance on Cloudflare to connect your worker to.
-
-You can create a D1 instance by navigating to the `Workers & Pages` section and selecting `D1 SQL Database.`
-
-Alternatively, you can create a D1 instance using the CLI:
+4. **Set up the database**:
 
 ```sh
-npx wrangler d1 create <database-name>
+# This will create the local database, run migrations, and seed the database
+pnpm run db:setup
 ```
 
-After creating the database, update the `wrangler.toml` file with the database id.
+5. **Start the development server**:
+
+```sh
+pnpm run dev
+```
+
+## Interacting with Agents
+
+The project includes two agent types:
+
+- **ChatAgent**: Handles conversational interactions
+- **AssistantAgent**: Provides assistant-style responses
+
+### HTTP Endpoints
+
+#### ChatAgent:
+
+```sh
+# GET request
+curl "http://localhost:8787/chat?message=Hello%20world"
+
+# POST request
+curl -X POST http://localhost:8787/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Hello via POST request"}'
+```
+
+#### AssistantAgent:
+
+```sh
+# GET request
+curl "http://localhost:8787/assistant?query=What%20time%20is%20it"
+
+# POST request
+curl -X POST http://localhost:8787/assistant \
+  -H "Content-Type: application/json" \
+  -d '{"query":"What is the weather like?"}'
+```
+
+### WebSocket Connections
+
+You can use any WebSocket client like [websocat](https://github.com/vi/websocat) to connect:
+
+```sh
+# ChatAgent direct connection
+websocat ws://localhost:8787/ChatAgent/roomId
+
+# Or using the legacy route
+websocat ws://localhost:8787/ws/chat/roomId
+```
+
+Once connected, send messages in JSON format:
+
+```json
+{"type":"message","content":"Hello from websocat!"}
+```
+
+For the AssistantAgent:
+
+```json
+{"type":"query","content":"What's the weather like?"}
+```
+
+## Creating New Agents
+
+To add a new agent:
+
+1. **Create a new agent file** in `src/agents/`:
+
+```typescript
+// src/agents/NewAgent.ts
+import { Agent, type Connection, type ConnectionContext } from "agents-sdk";
+import { type Bindings } from "../types";
+
+export class NewAgent extends Agent<Bindings> {
+  private connections = new Map<string, Connection>();
+  
+  async onRequest(request: Request) {
+    // Handle HTTP requests
+    return new Response("Response from NewAgent");
+  }
+
+  async onConnect(connection: Connection, ctx: ConnectionContext) {
+    // Handle WebSocket connection
+    console.log('NewAgent: New connection');
+    // Implementation...
+  }
+  
+  async onMessage(connection: Connection, message: any) {
+    // Handle incoming messages
+    console.log('Message received:', message);
+    // Implementation...
+  }
+}
+```
+
+2. **Export the new agent** in `src/agents/index.ts`:
+
+```typescript
+export { NewAgent } from './NewAgent';
+```
+
+3. **Add the agent to Bindings** in `src/types.ts`:
+
+```typescript
+export type Bindings = {
+  // Existing bindings...
+  NewAgent: DurableObjectNamespace;
+};
+```
+
+4. **Add routes** in `src/index.ts`:
+
+```typescript
+// HTTP endpoint
+app.get("/newagent", async (c) => {
+  const param = c.req.query('param') || "default";
+  try {
+    return await queryAgent(c.env.NewAgent, 'NewAgent', { param });
+  } catch (error: unknown) {
+    // Error handling...
+  }
+});
+```
+
+5. **Update wrangler.toml**:
 
 ```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "honc-d1-database"
-database_id = "<database-id-you-just-created>"
-migrations_dir = "drizzle/migrations"
+[durable_objects]
+bindings = [
+  # Existing bindings...
+  { name = "NewAgent", class_name = "NewAgent" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatAgent", "AssistantAgent", "NewAgent"]
 ```
 
-Include the following information in a `.prod.vars` file:
+## Deployment
+
+To deploy your worker to Cloudflare:
+
+1. **Create a D1 database** on Cloudflare:
 
 ```sh
-CLOUDFLARE_D1_TOKEN="" # An API token with D1 edit permissions. You can create API tokens from your Cloudflare profile
-CLOUDFLARE_ACCOUNT_ID="" # Find your Account id on the Workers & Pages overview (upper right)
-CLOUDFLARE_DATABASE_ID="" # Find the database ID under workers & pages under D1 SQL Database and by selecting the created database
+pnpm exec wrangler d1 create goose-release-db
 ```
 
-If you haven’t generated the latest migration files yet, run:
-```shell
-npm run db:generate
+2. **Update the `wrangler.toml`** with your database ID.
+
+3. **Create a `.prod.vars`** file with your production values:
+
+```sh
+cp .prod.vars.example .prod.vars
+# Edit .prod.vars with your values
 ```
 
-Afterwards, run the migration script for production:
-```shell
-npm run db:migrate:prod
+4. **Run migrations on production**:
+
+```sh
+pnpm run db:migrate:prod
 ```
 
-Change the name of the project in `wrangler.toml` to something appropriate for your project:
+5. **Deploy your worker**:
 
-```toml
-name = "my-d1-project"
+```sh
+pnpm run deploy
 ```
 
-Finally, deploy your worker
+## Technical Details
 
-```shell 
-npm run deploy
+### Durable Objects
+
+Agents are implemented as [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/), providing stateful computation and storage capabilities. Each agent has:
+
+- **Persistent storage**: SQLite database within the Durable Object
+- **Connection management**: Tracking active WebSocket connections
+- **Message handlers**: Processing incoming messages and generating responses
+
+### Agent Base Class
+
+All agents extend the `Agent<Bindings>` class from agents-sdk and must implement:
+
+- `onRequest`: Handles HTTP requests to the agent 
+- `onConnect`: Manages WebSocket connection establishments
+- `onMessage`: Processes incoming WebSocket messages
+
+### WebSocket vs HTTP
+
+- **WebSocket**: Better for interactive, stateful conversations
+- **HTTP**: Simpler for one-off requests or integrations with other systems
+
+### Headers for Agent Communication
+
+When communicating with agents, specific headers are required:
+
+```typescript
+headers.set('x-partykit-namespace', agentName);
+headers.set('x-partykit-room', roomId);
 ```
 
+These headers help route requests to the correct agent instance.
 
+### Agent Interactions
+
+There are two main ways to interact with agents:
+
+1. **Direct URL Patterns**:
+   - `/ChatAgent/roomId` - Direct WebSocket to ChatAgent
+   - `/AssistantAgent/roomId` - Direct WebSocket to AssistantAgent
+
+2. **REST API Endpoints**:
+   - `/chat` - HTTP endpoint for ChatAgent
+   - `/assistant` - HTTP endpoint for AssistantAgent
+
+### Data Persistence
+
+Durable Objects provide SQLite databases for persistent storage. The agent framework manages:
+
+- **State**: Store conversation history or user preferences
+- **Connections**: Track active WebSocket connections
+- **Sessions**: Maintain session information between connections
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+Based on the [HONC stack](https://honc.dev) created by [Fiberplane](https://github.com/fiberplane/create-honc-app).
